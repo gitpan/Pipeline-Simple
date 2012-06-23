@@ -1,0 +1,14 @@
+# -*-Perl-*- mode (for emacs)
+use Test::More tests => 8;
+use Data::Dumper;
+use File::Spec;
+
+
+sub test_input_file {
+    return File::Spec->catfile('t', 'data', @_);
+}
+
+diag( "Testing pipeline.pl from command line" );
+
+
+ok `bin/pipeline.pl -v` =~ /pipeline.pl, version/ 

@@ -1,0 +1,251 @@
+NAME
+    App::Pipeline::Simple - Simple workflow manager
+
+VERSION
+    version 0.9_1
+
+SYNOPSIS
+      # called from a script
+
+DESCRIPTION
+    Workflow management in computational (biological) sciences is a hard
+    problem. This module is based on assumption that UNIX pipe and redirect
+    system is closest to optimal solution with these improvements:
+
+    * Enforce the storing of all intermediary steps in a file.
+
+      This is for clarity, accountability and to enable arbitrarily big
+      data sets. Pipeline can contain independent steps that remove
+      intermediate files if so required.
+
+    * Naming of each step.
+
+      This is to make it possible to stop, restart, and restart at any
+      intermediate step after adjusting pipeline parameters.
+
+    * detailed logging
+
+      To keep track of all runs of the pipeline.
+
+    A pipeline is a collection of steps that are functionally equivalent to
+    a pipeline. In other words, execution of a pipeline equals to execution
+    of a each ordered step within the pipeline. From that derives that the
+    pipeline object model needs only one object that can recursively
+    represent the whole pipeline as well as individual steps.
+
+METHODS
+  new
+    Constructor
+
+  verbose
+    Control logging output. Defaults to 0.
+
+    Setting verbose sets the logging level:
+
+      verbose   =  -1    0     1
+      log level =>  WARN INFO  DEBUG
+
+  config
+    Read in the named config file.
+
+  id
+    ID of the step
+
+  description
+    Verbose description of the step
+
+  name
+    Name of the program that will be executed
+
+  path
+    Path to the directory where the program resides. Can be used if the
+    program is not on path. Will be prepended to the name.
+
+  next_id
+    ID of the next step in execution. It typically depends on the output of
+    this step.
+
+  input
+    Value read in interactively from command line
+
+  itype
+    Type of input for the command line value
+
+  start
+    The ID of the step to start the execution
+
+  stop
+    The ID of the step to stop the execution
+
+  dir
+    Working directory where all files are stored.
+
+  step
+    Returns the step by its ID.
+
+  each_next
+    Return an array of steps after this one.
+
+  each_step
+    Return all steps.
+
+  run
+    Run this step and call the one(s).
+
+  debug
+    Run in debug mode and test the configuration file
+
+  logger
+    Reference to the internal Log::Logger4perl object
+
+  render
+    Transcribe the step into a UNIX command line string ready for display or
+    execution.
+
+  stringify
+    Analyze the configuration without executing it.
+
+  graphviz
+    Create a GraphViz dot file from the config.
+
+RUNNING
+    App::Pipeline::Simple comes with a wrapper "spipe" command line program.
+    Do
+
+       spipe -h
+
+    to see instructions on how to run it.
+
+    Example run:
+
+      spipe -config t/data/string_manipulation.xml -d /tmp/test
+
+    reads instructions from the config file and writes all information to
+    the project directory.
+
+    The debug option will parse the config file, print out the command line
+    equivalents of all commands and print out warnings of problems
+    encountered in the file:
+
+      spipe -config t/data/string_manipulation.xml -d /tmp/test
+
+    An other tool integrated in the system is visualization of the execution
+    graph. It is done with the help of GraphViz perl interface module that
+    will need to be installed from CPAN.
+
+    The following command line creates a Graphviz dot file, converts it into
+    an image file and opens it with the Imagemagic display program:
+
+      spipe -config t/data/string_manipulation.xml -graph > \
+        /tmp/p.dot; dot -Tpng /tmp/p.dot | display
+
+CONFIGURATION
+    The default configuration is written in YAML, a simple and human
+    readable language that can be parsed in many languages cleanly into data
+    structures.
+
+    The YAML file contains four top level keys for the hash that the file
+    will be read into: 1) "name" to give the pipeline a short name, 2)
+    "version" to indicate the version number, 3) "description" to give a
+    more verbose explanation what the pipeline does, and 4) "steps" listing
+    pipeline steps.
+
+      ---
+      description: "Example of a pipeline"
+      name: String Manipulation
+      version: '0.4'
+      steps:
+
+    Each "step" needs an "id" that is unique within the pipeline and a
+    "name" that identifies an executable somewhere in the system path.
+    Alternatively, you can give the path leading to the executable file with
+    key "path". The name will be added to the path, padded with a suitable
+    separator character, if needed.
+
+    Arguments to the executable are given individually within "arg" tags.
+    They are named with the "key" attribute. A single hyphen is added in
+    front of the arguments when they are executed. If two hyphens are
+    needed, just add one the file.
+
+    Arguments can exist without values, or they can be given with attribute
+    "value".
+
+      s3:
+        name: cat
+        args:
+          in:
+            type: redir
+            value: s1.txt
+          "n": {}
+          out:
+            type: redir
+            value: s3_mod.txt
+        next:
+          - s4
+
+    There are two special keys "in" and "out" that need to have a further
+    "type" defined. The IO "type" can get two kind of values:
+
+    "unnamed"
+        that indicates that the argument is an unnamed argument to the
+        executable.
+
+    "redir"
+        will be interpreted as UNIX redirection character '&lt' or '&gt'
+        depending on the context.
+
+    The values "file" and "dir" are not needed by the pipeline but are
+    useful to include to make the pipeline easier to read for humans. The
+    interpretation of these arguments is done by the program executable
+    called by the step.
+
+    Finally, the "step" tag can contain the "next" key that gives an array
+    of IDs for the next steps in the execution. Typically, these steps
+    depends on the previous step for input.
+
+    Practices that are completely bonkers, like spaces in file names, are
+    not supported.
+
+  Advanced features
+    The pipeline does not have to be linear; it can contain branches. For
+    example, the pipeline can have several start points with different kinds
+    of input: file and string.
+
+    Sometimes it is useful to be run the same pipeline with different
+    parameter. The starting point of execution can take a value from the
+    command line. Leave the value for the given argument blank in the
+    configuration file and give it from the command line. Matching of values
+    is done by matching the type string.
+
+      spipe -conf input_demo.yml --input=ABC --itype=str
+
+      ---
+      description: "Demonstrate input from command line"
+      name: input.yml
+      version: '0.1'
+      steps:
+        s1:
+          name: echo
+          args:
+            in:
+              type: unnamed
+              value:
+            out:
+              type: redir
+              value: s1_string.txt
+
+    The empty "value" will be filled in from the command line into the
+    "config.yml" stored in the project directory. Also, the config file
+    looks slightly different since the steps are written out as
+    App::Pipeline::Simple objects. Functionally there is no difference.
+
+AUTHOR
+    Heikki Lehvaslaiho, KAUST (King Abdullah University of Science and
+    Technology).
+
+COPYRIGHT AND LICENSE
+    This software is copyright (c) 2012 by Heikki Lehvaslaiho.
+
+    This is free software; you can redistribute it and/or modify it under
+    the same terms as the Perl 5 programming language system itself.
+
